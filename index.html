@@ -1,0 +1,92 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Peer-to-Peer Chat</title>
+</head>
+<body>
+  <div id="chatBox">
+    <textarea id="messages" rows="10" cols="50" readonly></textarea><br>
+    <input type="text" id="messageInput" placeholder="Type your message"><br>
+    <button onclick="sendMessage()">Send</button>
+  </div>
+
+  <script>
+    
+    let localConnection;
+let remoteConnection;
+let sendChannel;
+let receiveChannel;
+
+function sendMessage() {
+  const messageInput = document.getElementById('messageInput');
+  const message = messageInput.value;
+
+  // Ensure sendChannel is created and ready
+  if (sendChannel) {
+    sendChannel.send(message);
+    messageInput.value = '';
+    appendMessage('You: ' + message);
+  } else {
+    console.error('Error: sendChannel not initialized');
+  }
+}
+
+function appendMessage(message) {
+  const messagesTextarea = document.getElementById('messages');
+  messagesTextarea.value += message + '\n';
+  messagesTextarea.scrollTop = messagesTextarea.scrollHeight;
+}
+
+function createConnection() {
+  const configuration = {
+    iceServers: [{ urls: "stun:stun.l.google.com:19302" }]
+  };
+
+  localConnection = new RTCPeerConnection(configuration);
+  remoteConnection = new RTCPeerConnection(configuration);
+
+  // Handle ICE candidates exchanged for connection establishment
+  localConnection.onicecandidate = event => {
+    if (event.candidate) {
+      remoteConnection.addIceCandidate(event.candidate);
+    }
+  };
+
+  remoteConnection.onicecandidate = event => {
+    if (event.candidate) {
+      localConnection.addIceCandidate(event.candidate);
+    }
+  };
+
+  // Create a data channel for sending messages
+  sendChannel = localConnection.createDataChannel('sendChannel');
+  sendChannel.onmessage = event => {
+    appendMessage('Friend: ' + event.data);
+  };
+
+  // Offer/Answer negotiation process for signaling
+  localConnection.createOffer().then(offer => {
+    return localConnection.setLocalDescription(offer);
+  }).then(() => {
+    // Provide the offer to the other peer (e.g., through a server or another mechanism)
+    return remoteConnection.setRemoteDescription(localConnection.localDescription);
+  }).then(() => {
+    return remoteConnection.createAnswer();
+  }).then(answer => {
+    return remoteConnection.setLocalDescription(answer);
+  }).then(() => {
+    return localConnection.setRemoteDescription(remoteConnection.localDescription);
+  }).catch(handleError);
+}
+
+function handleError(error) {
+  console.error('Error:', error);
+}
+
+// Initiate connection creation when the page loads
+createConnection();
+    </script>
+</body>
+</html>
